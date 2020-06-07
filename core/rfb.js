@@ -1842,7 +1842,7 @@ export default class RFB extends EventTargetMixin {
         if (this._FBU.rects === 0) {
             if (this._sock.rQwait("FBU header", 3, 1)) { return false; }
             this._sock.rQskipBytes(1);  // Padding
-            this._FBU.rects = this._sock.rQshift16();            
+            this._FBU.rects = this._sock.rQshift16();             
 
             // Make sure the previous frame is fully rendered first
             // to avoid building up an excessive queue

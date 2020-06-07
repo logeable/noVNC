@@ -9,6 +9,7 @@
 import * as Log from './util/logging.js';
 import Base64 from "./base64.js";
 import { supportsImageMetadata } from './util/browser.js';
+import {makeColorFrom16Pixel as makeColor} from './util/color.js';
 
 export default class Display {
     constructor(target) {
@@ -428,7 +429,7 @@ export default class Display {
                      this._tile.width, this._tile.height);
     }
 
-    blitImage(x, y, width, height, arr, offset, fromQueue) {
+    blitImage(x, y, width, height, arr, offset, context, fromQueue) {
         if (this._renderQ.length !== 0 && !fromQueue) {
             // NB(directxman12): it's technically more performant here to use preallocated arrays,
             // but it's a lot of extra work for not a lot of payoff -- if we're using the render queue,
@@ -442,9 +443,10 @@ export default class Display {
                 'y': y,
                 'width': width,
                 'height': height,
+                'context': context,
             });
         } else {
-            this._bgrxImageData(x, y, width, height, arr, offset);
+            this._bgrx16ImageData(x, y, width, height, arr, offset, context);
         }
     }
 
@@ -569,6 +571,20 @@ export default class Display {
         this._damage(x, y, img.width, img.height);
     }
 
+    _bgrx16ImageData(x, y, width, height, arr, offset, fb_context) {
+        const img = this._drawCtx.createImageData(width, height);
+        const data = img.data;
+        for (var i = 0, j = offset; i < width * height * 4; i += 4, j += 2) {
+            var bgrx = makeColor([arr[j], arr[j+1]], fb_context);
+            data[i]     = bgrx[2];
+            data[i + 1] = bgrx[1];
+            data[i + 2] = bgrx[0];
+            data[i + 3] = bgrx[3];  // Alpha
+        }
+        this._drawCtx.putImageData(img, x, y);
+        this._damage(x, y, img.width, img.height);
+    }
+
     _rgbxImageData(x, y, width, height, arr, offset) {
         // NB(directxman12): arr must be an Type Array view
         let img;
@@ -613,7 +629,7 @@ export default class Display {
                     this.fillRect(a.x, a.y, a.width, a.height, a.color, true);
                     break;
                 case 'blit':
-                    this.blitImage(a.x, a.y, a.width, a.height, a.data, 0, true);
+                    this.blitImage(a.x, a.y, a.width, a.height, a.data, 0, a.context, true);
                     break;
                 case 'blitRgb':
                     this.blitRgbImage(a.x, a.y, a.width, a.height, a.data, 0, true);

@@ -8,26 +8,12 @@
  */
 
 import * as Log from '../util/logging.js';
+import {makeColorFrom16Pixel as makeColor} from '../util/color.js';
 
 export default class HextileDecoder {
     constructor() {
         this._tiles = 0;
         this._lastsubencoding = 0;
-    }
-
-    makeColor(pixel, context) {
-        let color = pixel[0] + pixel[1]<<8        
-        let r24 = (color >> context.redShift) & context.redMax;
-        let g24 = (color >> context.greenShift) & context.greenMax;
-        let b24 = (color >> context.blueShift) & context.blueMax;
-        r24 *= 255 / (context.redMax + 1);
-        g24 *= 255 / (context.greenMax + 1);
-        b24 *= 255 / (context.blueMax + 1);
-
-        r24 = Math.ceil(r24);
-        g24 = Math.ceil(g24);
-        b24 = Math.ceil(b24);
-        return [b24, g24, r24, 255]
     }
 
     decodeRect(x, y, width, height, sock, display, depth, colorContext) {
@@ -102,15 +88,15 @@ export default class HextileDecoder {
                     display.fillRect(tx, ty, tw, th, this._background);
                 }
             } else if (subencoding & 0x01) {  // Raw
-                display.blitImage(tx, ty, tw, th, rQ, rQi);
+                display.blitImage(tx, ty, tw, th, rQ, rQi, colorContext);
                 rQi += bytes - 1;
             } else {
                 if (subencoding & 0x02) {  // Background
-                    this._background = this.makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
+                    this._background = makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
                     rQi += 2;
                 }
                 if (subencoding & 0x04) {  // Foreground
-                    this._foreground = this.makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
+                    this._foreground = makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
                     rQi += 2;
                 }
 
@@ -122,7 +108,7 @@ export default class HextileDecoder {
                     for (let s = 0; s < subrects; s++) {
                         let color;
                         if (subencoding & 0x10) {  // SubrectsColoured
-                            color = this.makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
+                            color = makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
                             rQi += 2;
                         } else {
                             color = this._foreground;
