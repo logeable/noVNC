@@ -15,7 +15,22 @@ export default class HextileDecoder {
         this._lastsubencoding = 0;
     }
 
-    decodeRect(x, y, width, height, sock, display, depth) {
+    makeColor(pixel, context) {
+        let color = pixel[0] + pixel[1]<<8        
+        let r24 = (color >> context.redShift) & context.redMax;
+        let g24 = (color >> context.greenShift) & context.greenMax;
+        let b24 = (color >> context.blueShift) & context.blueMax;
+        r24 *= 255 / (context.redMax + 1);
+        g24 *= 255 / (context.greenMax + 1);
+        b24 *= 255 / (context.blueMax + 1);
+
+        r24 = Math.ceil(r24);
+        g24 = Math.ceil(g24);
+        b24 = Math.ceil(b24);
+        return [b24, g24, r24, 255]
+    }
+
+    decodeRect(x, y, width, height, sock, display, depth, colorContext) {
         if (this._tiles === 0) {
             this._tilesX = Math.ceil(width / 16);
             this._tilesY = Math.ceil(height / 16);
@@ -40,8 +55,8 @@ export default class HextileDecoder {
             }
 
             const currTile = this._totalTiles - this._tiles;
-            const tileX = currTile % this._tilesX;
             const tileY = Math.floor(currTile / this._tilesX);
+            const tileX = currTile % this._tilesX;
             const tx = x + tileX * 16;
             const ty = y + tileY * 16;
             const tw = Math.min(16, (x + width) - tx);
@@ -49,13 +64,13 @@ export default class HextileDecoder {
 
             // Figure out how much we are expecting
             if (subencoding & 0x01) {  // Raw
-                bytes += tw * th * 4;
+                bytes += tw * th * 2;
             } else {
                 if (subencoding & 0x02) {  // Background
-                    bytes += 4;
+                    bytes += 2;
                 }
                 if (subencoding & 0x04) {  // Foreground
-                    bytes += 4;
+                    bytes += 2;
                 }
                 if (subencoding & 0x08) {  // AnySubrects
                     bytes++;  // Since we aren't shifting it off
@@ -66,7 +81,7 @@ export default class HextileDecoder {
 
                     let subrects = rQ[rQi + bytes - 1];  // Peek
                     if (subencoding & 0x10) {  // SubrectsColoured
-                        bytes += subrects * (4 + 2);
+                        bytes += subrects * (2 + 2);
                     } else {
                         bytes += subrects * 2;
                     }
@@ -91,12 +106,12 @@ export default class HextileDecoder {
                 rQi += bytes - 1;
             } else {
                 if (subencoding & 0x02) {  // Background
-                    this._background = [rQ[rQi], rQ[rQi + 1], rQ[rQi + 2], rQ[rQi + 3]];
-                    rQi += 4;
+                    this._background = this.makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
+                    rQi += 2;
                 }
                 if (subencoding & 0x04) {  // Foreground
-                    this._foreground = [rQ[rQi], rQ[rQi + 1], rQ[rQi + 2], rQ[rQi + 3]];
-                    rQi += 4;
+                    this._foreground = this.makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
+                    rQi += 2;
                 }
 
                 display.startTile(tx, ty, tw, th, this._background);
@@ -107,8 +122,8 @@ export default class HextileDecoder {
                     for (let s = 0; s < subrects; s++) {
                         let color;
                         if (subencoding & 0x10) {  // SubrectsColoured
-                            color = [rQ[rQi], rQ[rQi + 1], rQ[rQi + 2], rQ[rQi + 3]];
-                            rQi += 4;
+                            color = this.makeColor([rQ[rQi], rQ[rQi + 1]], colorContext);
+                            rQi += 2;
                         } else {
                             color = this._foreground;
                         }

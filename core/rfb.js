@@ -960,7 +960,7 @@ export default class RFB extends EventTargetMixin {
         this._sock.sendString("RFB " + cversion + "\n");
         Log.Debug('Sent ProtocolVersion: ' + cversion);
 
-        this._rfbInitState = 'Security';
+        this._rfbInitState = 'ServerInitialisation';
     }
 
     _negotiateSecurity() {
@@ -1382,6 +1382,14 @@ export default class RFB extends EventTargetMixin {
         const blueShift  = this._sock.rQshift8();
         this._sock.rQskipBytes(3);  // padding
 
+        this.colorContext = {
+            redMax,
+            greenMax,
+            blueMax,
+            redShift,
+            greenShift,
+            blueShift,            
+        }
         // NB(directxman12): we don't want to call any callbacks or print messages until
         //                   *after* we're past the point where we could backtrack
 
@@ -1834,7 +1842,7 @@ export default class RFB extends EventTargetMixin {
         if (this._FBU.rects === 0) {
             if (this._sock.rQwait("FBU header", 3, 1)) { return false; }
             this._sock.rQskipBytes(1);  // Padding
-            this._FBU.rects = this._sock.rQshift16();
+            this._FBU.rects = this._sock.rQshift16();            
 
             // Make sure the previous frame is fully rendered first
             // to avoid building up an excessive queue
@@ -2166,11 +2174,11 @@ export default class RFB extends EventTargetMixin {
             return false;
         }
 
-        try {
+        try {            
             return decoder.decodeRect(this._FBU.x, this._FBU.y,
                                       this._FBU.width, this._FBU.height,
                                       this._sock, this._display,
-                                      this._fbDepth);
+                                      this._fbDepth, this.colorContext);
         } catch (err) {
             this._fail("Error decoding rect: " + err);
             return false;
